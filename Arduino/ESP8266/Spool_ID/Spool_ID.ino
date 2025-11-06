@@ -203,12 +203,58 @@ void handleReadJson()
   webServer.send(200, "application/json", j);
 }
 
-void handleUiJs()
-{
-  // Minimal overlay script used by the simple UI; keep small and safe.
-  const char* js = "(function(){console.log('UI script loaded');})();";
-  webServer.send(200, "application/javascript", js);
+
+void handleUiJs() {
+  static const char uiJS[] = R"JS(
+(function(){ if (document.querySelector('.k2hud')) return;
+  const css = `
+  .k2hud{position:fixed;right:12px;bottom:12px;z-index:99999;font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  .k2hud .panel{background:#111;color:#fff;border-radius:12px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.35);opacity:.95}
+  .k2hud button{margin:4px 6px 0 0;padding:6px 10px;border-radius:8px;border:0;background:#2d6cdf;color:#fff;cursor:pointer}
+  .k2hud .lite{background:#445}
+  .k2toast{position:fixed;top:14px;right:14px;background:#111;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:99999}
+  `;
+  const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  const root = document.createElement('div'); root.className='k2hud'; root.innerHTML =
+    '<div class="panel">'+
+      '<div><b>K2 RFID</b></div>'+
+      '<div><button id="w2">Write ×2</button><button id="w1" class="lite">Write ×1</button><button id="r" class="lite">Read</button></div>'+
+      '<div id="k2s" style="margin-top:6px;opacity:.8">idle</div>'+
+    '</div>';
+  document.body.appendChild(root);
+  const toast=(t)=>{ const n=document.createElement('div'); n.className='k2toast'; n.textContent=t; document.body.appendChild(n); setTimeout(()=>n.remove(),2800); };
+  const set=(t)=>{ const el=document.getElementById('k2s'); if(el) el.textContent=t; };
+
+  const armWrite = (count)=>fetch('/arm_write?count='+count).then(r=>r.json()).then(()=>{ toast('WRITE armed ('+count+') — tap a tag'); set('write: waiting for tag…'); }).catch(()=>toast('Failed to arm WRITE'));
+  const armRead  = ()=>fetch('/arm_read').then(r=>r.json()).then(()=>{ toast('READ armed — tap a tag'); set('read: waiting for tag…'); }).catch(()=>toast('Failed to arm READ'));
+
+  document.getElementById('w2').onclick=()=>armWrite(2);
+  document.getElementById('w1').onclick=()=>armWrite(1);
+  document.getElementById('r').onclick =()=>armRead();
+
+  let lastMode=-1, lastRem=-1;
+  setInterval(()=>{
+    fetch('/status.json').then(r=>r.json()).then(s=>{
+      const m=s.mode, rem=s.remaining, err=s.error||'';
+      if (m!==lastMode || rem!==lastRem) {
+        if (m===1) { toast('WRITE armed — tap a tag'); }
+        if (m===2) { toast('Writing…'); }
+        if (m===3) { toast('Write OK'); }
+        if (m===4) { toast('Write FAILED: '+err); }
+        if (m===5) { toast('READ armed — tap a tag'); }
+        if (m===6) { toast('Reading…'); }
+        if (m===7) { toast('Read OK'); }
+        if (m===8) { toast('Read FAILED: '+err); }
+        lastMode=m; lastRem=rem;
+      }
+      const map=['idle','write_wait','writing','write_ok','write_fail','read_wait','reading','read_ok','read_fail'];
+      set(map[m] + (rem>0?('  ['+rem+' left]'):''));
+    }).catch(()=>{});
+  }, 500);
+})();)JS";
+  webServer.send(200, "application/javascript", uiJS);
 }
+
 
 void loadConfig()
 {

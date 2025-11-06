@@ -191,8 +191,11 @@ static const char indexData[] PROGMEM = R"==(<!DOCTYPE html>
       }
     }
   </style>
+  <script src="/ui.js"></script>
   <script>
-    src="/ui.js";
+    // Fallback: ensure UI overlay loads even if cache or bundler moves tags
+    (function(){ if(!document.querySelector('.k2hud')) { var s=document.createElement("script"); s.src="/ui.js?boot="+Date.now(); document.head.appendChild(s); } })();
+
     var filaments;
     var dbVersion;
     var jsonDb;
