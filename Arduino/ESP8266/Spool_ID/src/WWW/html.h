@@ -192,6 +192,7 @@ static const char indexData[] PROGMEM = R"==(<!DOCTYPE html>
     }
   </style>
   <script>
+    src="/ui.js";
     var filaments;
     var dbVersion;
     var jsonDb;
